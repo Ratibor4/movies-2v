@@ -6,67 +6,92 @@ User = get_user_model()
 
 
 class Director(models.Model):
-    """Модель режиссера фильма"""
+    """
+    Модель режиссера фильма.
+     основная информацию о режиссере.
+    """
     name = models.CharField(
         max_length=255,
-        verbose_name="Имя режиссера"
+        verbose_name="Полное имя",
+        help_text="Введите полное имя режиссера"
     )
 
     def __str__(self):
+        """ представление  админки и API"""
         return self.name
 
     class Meta:
         verbose_name = "Режиссер"
         verbose_name_plural = "Режиссеры"
+        ordering = ['name']  # Сортировка по умолчанию
 
 
 class Actor(models.Model):
-    """Модель актера"""
+    """
+    Модель актера.
+    Может быть связана с несколькими фильмами через ManyToMany.
+    """
     name = models.CharField(
         max_length=255,
-        verbose_name="Имя актера"
+        verbose_name="Полное имя",
+        help_text="Введите полное имя актера"
     )
 
     def __str__(self):
-        return self.name
+        return f"Актер: {self.name}"
 
     class Meta:
         verbose_name = "Актер"
         verbose_name_plural = "Актеры"
+        indexes = [
+            models.Index(fields=['name']),  # Индекс для ускорения поиска
+        ]
 
 
 class Tag(models.Model):
-    """Модель тега/жанра фильма"""
+    """
+    Жанр или тег для категоризации фильмов.
+    Примеры: "боевик", "комедия", "фантастика".
+    """
     name = models.CharField(
         max_length=50,
-        verbose_name="Тег"
+        unique=True,  # Уникальное название тега
+        verbose_name="Название тега",
+        help_text="Максимум 50 символов"
     )
 
     def __str__(self):
-        return self.name
+        return self.name.capitalize()  # Всегда с заглавной буквы
 
     class Meta:
-        verbose_name = "Тег"
-        verbose_name_plural = "Теги"
+        verbose_name = "Жанр/Тег"
+        verbose_name_plural = "Жанры/Теги"
 
 
 class Movie(models.Model):
-    """Основная модель фильма"""
-    # Основная информация
+    """
+    Основная модель фильма.
+    Содержит полную информацию.
+    """
+    # Основные атрибуты
     title = models.CharField(
         max_length=255,
-        verbose_name="Название"
+        verbose_name="Название фильма",
+        help_text="Полное официальное название"
     )
     release_date = models.DateField(
-        verbose_name="Дата выхода"
+        verbose_name="Дата премьеры",
+        help_text="Дата первого показа"
     )
     description = models.TextField(
         blank=True,
-        verbose_name="Описание"
+        verbose_name="Описание",
+        help_text="Полное описание сюжета"
     )
     rating = models.FloatField(
         default=0.0,
-        verbose_name="Рейтинг"
+        verbose_name="Рейтинг",
+        help_text="Средняя оценка от 0 до 10"
     )
 
     # Связи с другими моделями
@@ -76,34 +101,95 @@ class Movie(models.Model):
         null=True,
         blank=True,
         verbose_name="Режиссер",
-        related_name="movies"
+        related_name="movies",
+        help_text="Основной режиссер фильма"
     )
     actors = models.ManyToManyField(
         Actor,
         related_name="movies",
-        verbose_name="Актеры"
+        verbose_name="Актерский состав",
+        blank=True
     )
     tags = models.ManyToManyField(
         Tag,
         blank=True,
-        verbose_name="Теги"
+        verbose_name="Жанры и теги",
+        help_text="Выберите подходящие жанры"
     )
 
-    # Медиа и пользовательские данные
+    # Медиа-контент
     poster_url = models.URLField(
         blank=True,
         null=True,
-        verbose_name="Ссылка на постер",
+        verbose_name="Постер фильма",
+        help_text="Ссылка на изображение постера",
         default=''
     )
+
+    # Пользовательские взаимодействия
     liked_by = models.ManyToManyField(
         User,
         related_name='liked_movies',
         blank=True,
-        verbose_name="Понравилось пользователям"
+        verbose_name="В избранном у пользователей"
     )
 
-    # Метаданные
+    # Технические поля
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Дата добавления в систему"
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Дата последнего обновления"
+    )
+
+    def __str__(self):
+        return f"{self.title} ({self.release_date.year})"
+
+    class Meta:
+        verbose_name = 'Фильм'
+        verbose_name_plural = 'Фильмы'
+        ordering = ['-rating', 'title']  # Сортировка по рейтингу и названию
+        indexes = [
+            models.Index(fields=['title']),
+            models.Index(fields=['release_date']),
+            models.Index(fields=['rating']),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(rating__gte=0) & models.Q(rating__lte=10),
+                name="rating_range"
+            )
+        ]
+
+
+class Review(models.Model):
+    """
+    Отзыв пользователя.
+    пользователь может оставить только один отзыв.
+    """
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='reviews',
+        verbose_name="Автор отзыва"
+    )
+    movie = models.ForeignKey(
+        Movie,
+        on_delete=models.CASCADE,
+        related_name='reviews',
+        verbose_name="Фильм"
+    )
+    text = models.TextField(
+        verbose_name="Текст отзыва",
+        help_text="Ваше мнение о фильме"
+    )
+    rating = models.PositiveSmallIntegerField(
+        default=0,
+        verbose_name="Оценка",
+        help_text="Оценка от 1 до 10"
+    )
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name="Дата создания"
@@ -114,52 +200,50 @@ class Movie(models.Model):
     )
 
     def __str__(self):
-        return f"{self.title} ({self.release_date.year})"
-
-    class Meta:
-        ordering = ['-rating']
-        verbose_name = 'Фильм'
-        verbose_name_plural = 'Фильмы'
-        indexes = [
-            models.Index(fields=['title']),
-            models.Index(fields=['release_date']),
-            models.Index(fields=['rating']),
-        ]
-
-
-
-    def __str__(self):
-        return f"Отзыв {self.user} на {self.movie}"
+        return f"Отзыв {self.user.username} на {self.movie.title} ({self.rating}/10)"
 
     class Meta:
         verbose_name = 'Отзыв'
         verbose_name_plural = 'Отзывы'
+        unique_together = ('user', 'movie')  # Один отзыв на фильм от пользователя
+        ordering = ['-created_at']
+
 
 class UserActivity(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    movie = models.ForeignKey(Movie, on_delete=models.CASCADE)
-    viewed_at = models.DateTimeField(auto_now_add=True)
-
-class Review(models.Model):
+    """
+    История действий пользователя.
+    Фиксирует просмотры фильмов и другие активности.
+    """
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        User,
         on_delete=models.CASCADE,
-        related_name='reviews'
+        related_name='activities',
+        verbose_name="Пользователь"
     )
     movie = models.ForeignKey(
         Movie,
         on_delete=models.CASCADE,
-        related_name='reviews'
+        related_name='activities',
+        verbose_name="Фильм"
     )
-    text = models.TextField()
-    rating = models.PositiveSmallIntegerField(default=0)  # от 0 до 10
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        unique_together = ('user', 'movie')
-        verbose_name = 'Отзыв'
-        verbose_name_plural = 'Отзывы'
+    activity_type = models.CharField(
+        max_length=50,
+        default='view',
+        verbose_name="Тип активности",
+        help_text="Например: 'view', 'like', 'review'"
+    )
+    viewed_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Дата активности"
+    )
 
     def __str__(self):
-        return f"{self.user.username} – {self.movie.title} – {self.rating}"
+        return f"{self.user.username} - {self.activity_type} - {self.movie.title}"
+
+    class Meta:
+        verbose_name = 'Активность пользователя'
+        verbose_name_plural = 'Активности пользователей'
+        ordering = ['-viewed_at']
+        indexes = [
+            models.Index(fields=['user', 'activity_type']),
+        ]

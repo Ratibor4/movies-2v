@@ -6,6 +6,7 @@ from rest_framework_simplejwt.views import (
 )
 
 from authorization import views
+from authorization.views import FavoriteMoviesView
 
 urlpatterns = [
     path('auth/health/', views.HealthApiView.as_view()),
@@ -18,7 +19,7 @@ urlpatterns = [
     path('auth/logout/', views.LogoutApiView.as_view()),
     path('auth/profile/', views.UserProfileView.as_view(), name='user-profile'),
     path('auth/preferences/', views.UserPreferencesView.as_view(), name='user-preferences'),
-    path('auth/favorites/', views.FavoriteMoviesView.as_view(), name='favorite-movies'),
+    path('favorites/<int:movie_id>/', FavoriteMoviesView.as_view(), name='favorite-movie'),
     path('auth/favorites/<int:movie_id>/', views.FavoriteMoviesView.as_view(), name='favorite-movie-toggle'),
     path('auth/history/', views.UserHistoryView.as_view(), name='user-history'),
 ]
