@@ -21,25 +21,6 @@ class TagSerializer(serializers.ModelSerializer):
         fields = ['id', 'name']
 
 
-class MovieSerializer(serializers.ModelSerializer):
-    is_favorite = serializers.SerializerMethodField()
-    director = DirectorSerializer()
-    actors = ActorSerializer(many=True)
-    tags = TagSerializer(many=True)
-
-    class Meta:
-        model = Movie
-        fields = [
-            'id', 'title', 'description', 'release_date', 'rating',
-            'poster_url', 'director', 'actors', 'tags', 'is_favorite'
-        ]
-
-    def get_is_favorite(self, obj):
-        """Проверяем, есть ли фильм в избранном у пользователя"""
-        user = self.context.get('user')
-        if user and user.is_authenticated:
-            return user.favorite_movies.filter(id=obj.id).exists()
-        return False
 class InputSerializer(serializers.ModelSerializer):
     def validate_password(self, value):
         try:
@@ -47,12 +28,6 @@ class InputSerializer(serializers.ModelSerializer):
         except ValidationError as e:
             raise serializers.ValidationError(e.messages)
         return value
-
-class MovieListAPIView(ListAPIView):
-    queryset = Movie.objects.all()
-    serializer_class = MovieSerializer
-
-
 
 class ReviewSerializer(serializers.ModelSerializer):
     user = serializers.StringRelatedField(read_only=True)
@@ -74,11 +49,24 @@ class ReviewSerializer(serializers.ModelSerializer):
 class MovieSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True, read_only=True)
     actors = ActorSerializer(many=True, read_only=True)
+    director = DirectorSerializer(read_only=True)
     reviews = ReviewSerializer(many=True, read_only=True)
+    is_favorite = serializers.SerializerMethodField()
+    liked_by = serializers.PrimaryKeyRelatedField(read_only=True, many=True)
 
     class Meta:
         model = Movie
-        fields = '__all__'
+        fields = [
+            'id', 'title', 'description', 'release_date', 'rating', 'poster_url',
+            'director', 'actors', 'tags', 'reviews', 'created_at', 'updated_at',
+            'is_favorite', 'liked_by'
+        ]
+
+    def get_is_favorite(self, obj):
+        user = self.context.get('user') or self.context['request'].user
+        if user and user.is_authenticated:
+            return obj.liked_by.filter(id=user.id).exists()
+        return False
 
 class MovieTitleSerializer(serializers.ModelSerializer):
     class Meta:

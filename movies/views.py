@@ -17,6 +17,7 @@ from movies.serializers import MovieSerializer, ReviewSerializer, MovieListSeria
 from rest_framework import filters
 
 
+
 class HealthApiView(APIView):
     """
     эндпоинт для проверки работоспособности API.
@@ -184,14 +185,15 @@ class MeApiView(APIView):
 
 
 class MovieViewSet(ReadOnlyModelViewSet):
-    queryset = Movie.objects.all()
+    queryset = Movie.objects.all().prefetch_related('actors', 'tags', 'reviews', 'liked_by').select_related('director')
     serializer_class = MovieSerializer
-    filterset_class = MovieFilter
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filter_backends = [filters.SearchFilter, DjangoFilterBackend]
     search_fields = ['title']
 
-    def get_queryset(self):
-        return super().get_queryset().select_related('director').prefetch_related('actors', 'tags')
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['user'] = self.request.user  # чтобы is_favorite работал
+        return context
 
     def list(self, request, *args, **kwargs):
         search_query = request.query_params.get('search')
