@@ -1,7 +1,5 @@
 from sqlite3 import IntegrityError
-
 from django.contrib.auth import get_user_model, authenticate, logout
-from django.http import HttpResponse
 from rest_framework import serializers, status
 from rest_framework.generics import RetrieveUpdateAPIView, get_object_or_404
 from rest_framework.parsers import MultiPartParser
@@ -13,7 +11,8 @@ from authorization.constants import ROLE_ADMIN, ROLE_USER, ROLE_MODERATOR
 from movies.models import UserActivity
 from authorization.serializers import UserProfileSerializer, UpdateProfileSerializer, UpdatePreferencesSerializer
 from movies.models import Movie
-from movies.serializers import MovieSerializer
+from movies.serializers import MovieSerializer, MovieTitleSerializer
+
 
 class HealthApiView(APIView):
     """Проверка работоспособности API (healthcheck endpoint)"""
@@ -169,28 +168,24 @@ class UserPreferencesView(APIView):
 
 
 class FavoriteMoviesView(APIView):
-    """Управление избранными фильмами пользователя"""
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
-        """Получение списка избранных фильмов"""
-        movies = request.user.liked_movies.all()
-        serializer = MovieSerializer(movies, many=True)
-        return Response(serializer.data)
-
     def post(self, request, movie_id):
-        """Добавление фильма в избранное"""
         movie = get_object_or_404(Movie, id=movie_id)
-        request.user.liked_movies.add(movie)
-        UserActivity.objects.create(user=request.user, action=f"Добавил в избранное: {movie.title}")
-        return Response({'status': 'Фильм добавлен в избранное'}, status=status.HTTP_201_CREATED)
+        user = request.user
 
-    def delete(self, request, movie_id):
-        """Удаление фильма из избранного"""
-        movie = get_object_or_404(Movie, id=movie_id)
-        request.user.liked_movies.remove(movie)
-        return Response({'status': 'Фильм удален из избранного'})
+        if movie in user.favorite_movies.all():
+            user.favorite_movies.remove(movie)
+            return Response({"detail": "Removed from favorites."}, status=status.HTTP_200_OK)
+        else:
+            user.favorite_movies.add(movie)
+            return Response({"detail": "Added to favorites."}, status=status.HTTP_201_CREATED)
 
+    def get(self, request):
+        user = request.user
+        favorite_movies = user.favorite_movies.all()
+        serializer = MovieTitleSerializer(favorite_movies, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 class UserHistoryView(APIView):
     permission_classes = [IsAuthenticated]
 

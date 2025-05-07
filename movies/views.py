@@ -2,20 +2,19 @@ from django.contrib.auth import get_user_model, authenticate, login, logout
 from django.contrib.auth.hashers import make_password
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
-from drf_spectacular.utils import extend_schema, OpenApiParameter
-from rest_framework import serializers, status, viewsets, permissions
+from drf_spectacular.utils import extend_schema
+from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.generics import GenericAPIView, ListAPIView, get_object_or_404
+from rest_framework.generics import  ListAPIView, get_object_or_404
 from rest_framework.viewsets import ReadOnlyModelViewSet
-
 from authorization.constants import ROLE_ADMIN, ROLE_USER, ROLE_MODERATOR
 from movies.filters import MovieFilter
 from movies.models import Movie, Review
-from movies.serializers import MovieSerializer, ReviewSerializer
+from movies.serializers import MovieSerializer, ReviewSerializer, MovieListSerializer
+from rest_framework import filters
 
 
 class HealthApiView(APIView):
@@ -188,46 +187,41 @@ class MovieViewSet(ReadOnlyModelViewSet):
     queryset = Movie.objects.all()
     serializer_class = MovieSerializer
     filterset_class = MovieFilter
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    search_fields = ['title']
 
     def get_queryset(self):
-        """Оптимизация запросов"""
-        queryset = super().get_queryset()
-        return queryset.select_related('director').prefetch_related('actors', 'tags')
+        return super().get_queryset().select_related('director').prefetch_related('actors', 'tags')
 
-    @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
-    def favorite(self, request, pk=None):
-        """Добавление/удаление фильма из избранного"""
-        movie = self.get_object()
-        user = request.user
+    def list(self, request, *args, **kwargs):
+        search_query = request.query_params.get('search')
+        if search_query:
+            try:
+                movie = self.get_queryset().get(title__icontains=search_query)
+                serializer = self.get_serializer(movie)
+                return Response(serializer.data)
+            except Movie.DoesNotExist:
+                return Response({'detail': 'Фильм не найден'}, status=404)
 
-
-        if request.method == 'POST':
-            user.favorite_movies.add(movie)
-            return Response({'status': 'added to favorites'}, status=201)
-        else:
-            user.favorite_movies.remove(movie)
-            return Response({'status': 'removed from favorites'})
-
-
-
-    def get_serializer_context(self):
-        """Добавляем флаг is_favorite в контекст сериализатора"""
-        context = super().get_serializer_context()
-        context['user'] = self.request.user if self.request.user.is_authenticated else None
-        return context
+        return super().list(request, *args, **kwargs)
+    def get_serializer_class(self):
+        if self.action == 'list':
+            if self.request.query_params.get('search'):
+                return MovieSerializer
+            return MovieListSerializer
+        return self.serializer_class
 
 class MovieSearchView(ListAPIView):
     """
     Поиск фильмов по названию и описанию.
     Использует встроенный SearchFilter DRF.
     """
-    queryset = Movie.objects.all()
-    serializer_class = MovieSerializer
-    filter_backends = [SearchFilter]
-    search_fields = ['title', 'description']
-
-
+    permission_classes = [AllowAny]
+    def get(self, request):
+        query = request.query_params.get('search', '')
+        movies = Movie.objects.filter(title__icontains=query)
+        serializer = MovieListSerializer(movies, many=True)
+        return Response(serializer.data)
 class TopMoviesAPIView(APIView):
     """
     Возвращает топ-10 фильмов по рейтингу.

@@ -79,3 +79,15 @@ class MovieSerializer(serializers.ModelSerializer):
     class Meta:
         model = Movie
         fields = '__all__'
+
+class MovieTitleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Movie
+        fields = ['id', 'title']
+
+class MovieListSerializer(serializers.ModelSerializer):
+    director = serializers.StringRelatedField()
+
+    class Meta:
+        model = Movie
+        fields = ['id', 'title', 'director']
