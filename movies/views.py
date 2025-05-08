@@ -11,7 +11,6 @@ from rest_framework.views import APIView
 from rest_framework.generics import  ListAPIView, get_object_or_404
 from rest_framework.viewsets import ReadOnlyModelViewSet
 from authorization.constants import ROLE_ADMIN, ROLE_USER, ROLE_MODERATOR
-from movies.filters import MovieFilter
 from movies.models import Movie, Review
 from movies.serializers import MovieSerializer, ReviewSerializer, MovieListSerializer
 from rest_framework import filters
@@ -187,6 +186,7 @@ class MeApiView(APIView):
 class MovieViewSet(ReadOnlyModelViewSet):
     queryset = Movie.objects.all().prefetch_related('actors', 'tags', 'reviews', 'liked_by').select_related('director')
     serializer_class = MovieSerializer
+    permission_classes = [AllowAny]
     filter_backends = [filters.SearchFilter, DjangoFilterBackend]
     search_fields = ['title']
 

@@ -136,21 +136,19 @@ class MeApiView(APIView):
     def get(self, request, *args, **kwargs):
         return Response(self.OutputSerializer(request.user).data)
 
-class UserProfileView(RetrieveUpdateAPIView):
-    """Управление профилем пользователя"""
-    serializer_class = UserProfileSerializer
+class UserProfileView(APIView):
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser]  # Для загрузки файлов (аватар)
 
-    def get_object(self):
-        """Возвращает текущего авторизованного пользователя"""
-        return self.request.user
+    def get(self, request):
+        serializer = UserProfileSerializer(request.user)
+        return Response(serializer.data)
 
-    def get_serializer_class(self):
-        """Выбор сериализатора в зависимости от метода"""
-        if self.request.method in ['PUT', 'PATCH']:
-            return UpdateProfileSerializer
-        return UserProfileSerializer
+    def patch(self, request):
+        serializer = UpdateProfileSerializer(request.user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class UserPreferencesView(APIView):
     permission_classes = [IsAuthenticated]
@@ -171,6 +169,7 @@ class FavoriteMoviesView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, movie_id):
+        """Добавить или удалить фильм из избранного (переключатель)"""
         movie = get_object_or_404(Movie, id=movie_id)
         user = request.user
 
@@ -182,10 +181,22 @@ class FavoriteMoviesView(APIView):
             return Response({"detail": "Added to favorites."}, status=status.HTTP_201_CREATED)
 
     def get(self, request):
+        """Получить список избранных фильмов"""
         user = request.user
         favorite_movies = user.favorite_movies.all()
         serializer = MovieTitleSerializer(favorite_movies, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def delete(self, request, movie_id):
+        """Удалить фильм из избранного (конкретно, через DELETE-запрос)"""
+        movie = get_object_or_404(Movie, id=movie_id)
+        user = request.user
+
+        if movie in user.favorite_movies.all():
+            user.favorite_movies.remove(movie)
+            return Response({"detail": "Removed from favorites."}, status=status.HTTP_204_NO_CONTENT)
+        else:
+            return Response({"detail": "Movie not in favorites."}, status=status.HTTP_404_NOT_FOUND)
 class UserHistoryView(APIView):
     permission_classes = [IsAuthenticated]
 

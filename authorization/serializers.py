@@ -20,19 +20,19 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'id', 'username', 'email', 'avatar', 'role',
             'date_joined', 'favorite_movies', 'preferred_tags'
         ]
-        read_only_fields = ['id', 'role', 'date_joined']  # Эти поля нельзя менять
+        read_only_fields = ['id', 'role', 'date_joined']
 
 
 class UpdateProfileSerializer(serializers.ModelSerializer):
-    """
-    Сериализатор для обновления основных данных профиля.
-    Ограниченный набор полей, доступных для изменения.
-    """
     class Meta:
-        model = User
-        fields = ['username', 'email', 'avatar']  # Только эти поля можно обновлять
-
-
+        model = User  # твоя кастомная модель пользователя
+        fields = ['username', 'first_name', 'last_name', 'email']
+        extra_kwargs = {
+            'username': {'required': False},
+            'email': {'required': False},
+            'first_name': {'required': False},
+            'last_name': {'required': False},
+        }
 class UpdatePreferencesSerializer(serializers.ModelSerializer):
     """
     Сериализатор для обновления предпочтений пользователя.

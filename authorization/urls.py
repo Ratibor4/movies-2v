@@ -7,6 +7,10 @@ from rest_framework_simplejwt.views import (
 
 from authorization import views
 from authorization.views import FavoriteMoviesView
+from movies.urls import router
+
+
+
 
 urlpatterns = [
     path('auth/health/', views.HealthApiView.as_view()),

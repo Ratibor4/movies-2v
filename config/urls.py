@@ -20,7 +20,7 @@ from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include('movies.urls')),  # Все пути будут начинаться с /api/
+    path('api/', include('movies.urls')),
     path('', include('authorization.urls')),
 
 ]

@@ -1,5 +1,4 @@
 from rest_framework import serializers
-from rest_framework.generics import ListAPIView
 from movies.models import Review
 from .models import Movie, Director, Actor, Tag
 from django.contrib.auth.password_validation import validate_password
